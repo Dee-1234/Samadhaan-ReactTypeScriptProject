@@ -1,0 +1,209 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function incoming() {
+      return request.resource.data;
+    }
+    function existing() {
+      return resource.data;
+    }
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    function isCloseToRequestTime(ts) {
+      return ts is timestamp && 
+             ts >= request.time - duration.value(5, 'm') && 
+             ts <= request.time + duration.value(5, 'm');
+    }
+    
+    // Check if the user has the specified role
+    function isAgent() {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'municipal_agent';
+    }
+    function isAdmin() {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Connection Validation Path ---
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // --- Users Collection ---
+    match /users/{userId} {
+      allow read: if isSignedIn() && (isOwner(userId) || (!isOwner(userId) && (isAgent() || isAdmin())));
+      allow create: if isSignedIn() && isOwner(userId) && isValidUser(incoming(), userId) && isCloseToRequestTime(incoming().createdAt) && isCloseToRequestTime(incoming().updatedAt);
+      allow update: if isSignedIn() && (
+        (isOwner(userId) && isValidUser(incoming(), userId) && isCloseToRequestTime(incoming().updatedAt) && incoming().role == existing().role) ||
+        (!isOwner(userId) && (isAgent() || isAdmin()) && isValidUser(incoming(), userId) && isCloseToRequestTime(incoming().updatedAt) && incoming().role == existing().role && incoming().diff(existing()).affectedKeys().hasOnly(['points', 'updatedAt']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    function isValidUser(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'photoURL', 'role', 'points', 'reportsCount', 'verificationsCount', 'createdAt', 'updatedAt'])
+        && data.keys().size() == 10
+        && data.uid == userId
+        && data.email is string && data.email.size() <= 128
+        && data.displayName is string && data.displayName.size() <= 128
+        && data.photoURL is string && data.photoURL.size() <= 1000
+        && data.role in ['citizen', 'municipal_agent', 'admin']
+        && data.points is int
+        && data.reportsCount is int
+        && data.verificationsCount is int;
+    }
+
+    // --- Reports Collection ---
+    match /reports/{reportId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(reportId) && (
+        (isValidNewReport(incoming()) && isCloseToRequestTime(incoming().createdAt) && isCloseToRequestTime(incoming().updatedAt)) ||
+        (reportId in ['seed_1', 'seed_2', 'seed_3'] && incoming().reporterId == 'municipal_system' && isValidSeedReport(incoming()))
+      );
+      
+      allow update: if isSignedIn() && isValidId(reportId) && (
+        // Action 1: Reporter editing their own reported issue (only if status is still 'Reported')
+        (isOwner(existing().reporterId) && existing().status == 'Reported' && isValidReportUpdate(incoming()) && isCloseToRequestTime(incoming().updatedAt) && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'updatedAt'])) ||
+        
+        // Action 2: Citizen upvoting/verifying an issue
+        (isValidReportUpvote(incoming()) && isCloseToRequestTime(incoming().updatedAt) && incoming().diff(existing()).affectedKeys().hasOnly(['upvotes', 'updatedAt'])) ||
+        
+        // Action 3: Municipal Agent or Admin updating status
+        ((isAgent() || isAdmin()) && isValidReportStatusUpdate(incoming()) && isCloseToRequestTime(incoming().updatedAt) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+      );
+      
+      allow delete: if isAdmin() || (isOwner(existing().reporterId) && existing().status == 'Reported');
+    }
+
+    function isValidNewReport(data) {
+      return data.keys().hasAll(['id', 'title', 'description', 'category', 'imageUrl', 'latitude', 'longitude', 'address', 'status', 'severity', 'reporterId', 'reporterName', 'upvotes', 'createdAt', 'updatedAt'])
+        && data.keys().size() == 15
+        && data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.description is string && data.description.size() > 0 && data.description.size() <= 1000
+        && data.category is string && data.category.size() <= 100
+        && data.imageUrl is string && data.imageUrl.size() <= 1048576
+        && (data.latitude is float || data.latitude is int)
+        && (data.longitude is float || data.longitude is int)
+        && data.address is string && data.address.size() <= 500
+        && data.status == 'Reported'
+        && data.severity in ['Low', 'Medium', 'High', 'Critical']
+        && data.reporterId == request.auth.uid
+        && data.reporterName is string && data.reporterName.size() <= 128
+        && data.upvotes == 0;
+    }
+
+    function isValidSeedReport(data) {
+      return data.keys().hasAll(['id', 'title', 'description', 'category', 'imageUrl', 'latitude', 'longitude', 'address', 'status', 'severity', 'reporterId', 'reporterName', 'upvotes', 'createdAt', 'updatedAt'])
+        && data.keys().size() == 15
+        && data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.description is string && data.description.size() > 0 && data.description.size() <= 1000
+        && data.category is string && data.category.size() <= 100
+        && data.imageUrl is string && data.imageUrl.size() <= 1048576
+        && (data.latitude is float || data.latitude is int)
+        && (data.longitude is float || data.longitude is int)
+        && data.address is string && data.address.size() <= 500
+        && data.status in ['Reported', 'Investigating', 'In Progress', 'Resolved']
+        && data.severity in ['Low', 'Medium', 'High', 'Critical']
+        && data.reporterId == 'municipal_system'
+        && data.reporterName == 'AI Inspector'
+        && data.upvotes is int;
+    }
+
+    function isValidReportUpdate(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.description is string && data.description.size() > 0 && data.description.size() <= 1000;
+    }
+
+    // Since upvotes field is incremented on the existing report document:
+    function isValidReportUpvote(data) {
+      return data.upvotes is int && data.upvotes == existing().upvotes + 1;
+    }
+
+    function isValidReportStatusUpdate(data) {
+      return data.status in ['Reported', 'Investigating', 'In Progress', 'Resolved'];
+    }
+
+    // --- Verifications Subcollection ---
+    match /reports/{reportId}/verifications/{verificationId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(verificationId) && isValidVerification(incoming()) && isCloseToRequestTime(incoming().createdAt);
+      allow delete: if isOwner(existing().userId) || isAdmin();
+    }
+
+    function isValidVerification(data) {
+      return data.keys().hasAll(['id', 'userId', 'userName', 'createdAt'])
+        && data.keys().size() == 4
+        && data.id is string && data.id.size() <= 128
+        && data.userId == request.auth.uid
+        && data.userName is string && data.userName.size() <= 128;
+    }
+
+    // --- Comments Subcollection ---
+    match /reports/{reportId}/comments/{commentId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(commentId) && isValidNewComment(incoming()) && isCloseToRequestTime(incoming().createdAt) && (
+        incoming().userRole == 'citizen' || 
+        (incoming().userRole == 'municipal_agent' && isAgent()) ||
+        (incoming().userRole == 'admin' && isAdmin())
+      );
+      allow update: if isSignedIn() && isValidId(commentId) && (
+        // Action 1: Any signed in user can flag a comment
+        (incoming().diff(existing()).affectedKeys().hasOnly(['flagged', 'flaggedBy']) && incoming().flagged == true) ||
+        // Action 2: Municipal agent or Admin can resolve/dismiss flags
+        ((isAgent() || isAdmin()) && incoming().diff(existing()).affectedKeys().hasOnly(['flagged', 'flaggedBy']) && incoming().flagged == false && incoming().flaggedBy.size() == 0)
+      );
+      allow delete: if isOwner(existing().userId) || isAdmin();
+    }
+
+    function isValidNewComment(data) {
+      return data.keys().hasAll(['id', 'userId', 'userName', 'userRole', 'text', 'createdAt'])
+        && (data.keys().size() == 6 || (data.keys().size() == 8 && data.keys().hasAll(['flagged', 'flaggedBy'])))
+        && data.id is string && data.id.size() <= 128
+        && data.userId == request.auth.uid
+        && data.userName is string && data.userName.size() <= 128
+        && data.userRole in ['citizen', 'municipal_agent', 'admin']
+        && data.text is string && data.text.size() > 0 && data.text.size() <= 1000;
+    }
+
+    // --- Notifications Subcollection ---
+    match /users/{userId}/notifications/{notificationId} {
+      allow read, list: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming(), userId) && isCloseToRequestTime(incoming().createdAt);
+      allow update: if isSignedIn() && isOwner(userId) && incoming().read == true && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if isSignedIn() && isOwner(userId);
+    }
+
+    function isValidNotification(data, userId) {
+      return data.keys().hasAll(['id', 'userId', 'type', 'title', 'message', 'reportId', 'reportTitle', 'read', 'createdAt'])
+        && (data.keys().size() == 9 || (data.keys().size() == 10 && 'commentId' in data))
+        && data.id is string && data.id.size() <= 128
+        && data.userId == userId
+        && data.type in ['status_change', 'new_comment']
+        && data.title is string && data.title.size() <= 200
+        && data.message is string && data.message.size() <= 500
+        && data.reportId is string && data.reportId.size() <= 128
+        && data.reportTitle is string && data.reportTitle.size() <= 200
+        && data.read == false
+        && (!('commentId' in data) || (data.commentId is string && data.commentId.size() <= 128));
+    }
+  }
+}

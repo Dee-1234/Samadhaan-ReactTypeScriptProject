@@ -1,0 +1,6 @@
+{
+  "name": "Samadhaan",
+  "description": "A hyperlocal problem-solving platform that enables citizens to identify, report, validate, track, and resolve community issues through collaboration, data, and intelligent automation.",
+  "requestFramePermissions": ["geolocation", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,111 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user profile representing a citizen or municipal official.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique user ID matching request.auth.uid" },
+        "email": { "type": "string", "description": "The user's email address" },
+        "displayName": { "type": "string", "description": "The user's display name" },
+        "photoURL": { "type": "string", "description": "The user's avatar image URL" },
+        "role": { "type": "string", "enum": ["citizen", "municipal_agent", "admin"], "description": "The user's role on the platform" },
+        "points": { "type": "integer", "description": "Gamification points earned by the citizen" },
+        "reportsCount": { "type": "integer", "description": "Number of issues reported by this user" },
+        "verificationsCount": { "type": "integer", "description": "Number of issue verifications performed by this user" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "The creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "The last update timestamp" }
+      },
+      "required": ["uid", "email", "displayName", "role", "points", "reportsCount", "verificationsCount", "createdAt", "updatedAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "A hyperlocal issue reported by a citizen.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique report ID" },
+        "title": { "type": "string", "description": "Title of the reported issue" },
+        "description": { "type": "string", "description": "Detailed description of the issue" },
+        "category": { "type": "string", "description": "AI-categorized issue category" },
+        "imageUrl": { "type": "string", "description": "Image attachment URL or base64 data" },
+        "latitude": { "type": "number", "description": "Latitude coordinate of the issue" },
+        "longitude": { "type": "number", "description": "Longitude coordinate of the issue" },
+        "address": { "type": "string", "description": "Street address or localized description of coordinates" },
+        "status": { "type": "string", "enum": ["Reported", "Investigating", "In Progress", "Resolved"], "description": "Current status of the issue" },
+        "severity": { "type": "string", "enum": ["Low", "Medium", "High", "Critical"], "description": "AI-predicted or user-reported severity level" },
+        "reporterId": { "type": "string", "description": "User ID of the reporter" },
+        "reporterName": { "type": "string", "description": "Display name of the reporter" },
+        "upvotes": { "type": "integer", "description": "Count of verifications/upvotes from other citizens" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["id", "title", "description", "category", "imageUrl", "latitude", "longitude", "address", "status", "severity", "reporterId", "reporterName", "upvotes", "createdAt", "updatedAt"]
+    },
+    "Verification": {
+      "title": "Verification",
+      "description": "A verification vote confirming that the issue exists.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Verification ID" },
+        "userId": { "type": "string", "description": "ID of the verifying citizen" },
+        "userName": { "type": "string", "description": "Name of the verifying citizen" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of verification" }
+      },
+      "required": ["id", "userId", "userName", "createdAt"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A comment, discussion, or updates from other citizens or municipal agents.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique comment ID" },
+        "userId": { "type": "string", "description": "ID of the commenter" },
+        "userName": { "type": "string", "description": "Display name of the commenter" },
+        "userRole": { "type": "string", "description": "Role of the commenter (e.g. municipal_agent)" },
+        "text": { "type": "string", "description": "The comment text body" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of the comment" }
+      },
+      "required": ["id", "userId", "userName", "userRole", "text", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "A real-time notification alert for a citizen when their reported issue status changes or when they receive a comment.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique notification ID" },
+        "userId": { "type": "string", "description": "The target user's ID" },
+        "type": { "type": "string", "enum": ["status_change", "new_comment"], "description": "Type of the notification" },
+        "title": { "type": "string", "description": "Title of the notification" },
+        "message": { "type": "string", "description": "Alert message body" },
+        "reportId": { "type": "string", "description": "ID of the associated report" },
+        "reportTitle": { "type": "string", "description": "Title of the associated report" },
+        "commentId": { "type": "string", "description": "Optional comment ID if type is new_comment" },
+        "read": { "type": "boolean", "description": "Whether the user has read the notification" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when notification was created" }
+      },
+      "required": ["id", "userId", "type", "title", "message", "reportId", "reportTitle", "read", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile collection."
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications subcollection."
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Hyperlocal community issues collection."
+    },
+    "/reports/{reportId}/verifications/{verificationId}": {
+      "schema": "Verification",
+      "description": "Verification votes subcollection for an issue."
+    },
+    "/reports/{reportId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Comments and official updates under a report."
+    }
+  }
+}
