@@ -49,3 +49,6 @@ Run the application:
 
 # Credits
 Built for the community, powered by Google AI.
+
+# Google AI Publish Link(Deployment Link)
+https://samadhaan-8462746882.asia-southeast1.run.app
