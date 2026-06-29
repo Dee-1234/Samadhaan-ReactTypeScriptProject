@@ -7,14 +7,16 @@ In traditional applications, an issue report requires a database, a server, and 
 # Tech Stack
 1. Frontend: React (TypeScript), Tailwind CSS
 2. Intelligence Layer: Google AI Studio (Gemini 3.5 Flash)
-3. Data Management: Gemini-native JSON-mode structured persistence
-4. Deployment: Google AI studio
+3. Authentication: Firebase Auth (Email/Password & Google OAuth)
+4. Data Management: Gemini-native JSON-mode structured persistence
+5. Deployment: Google AI studio
 
 # Key Features
 1. AI-First Classification: Every issue is processed via Gemini, which identifies the category (e.g., Sanitation, Infrastructure), severity level, and potential impact.
-2. Intelligent Resolution: Gemini evaluates the issue description and image, providing immediate actionable insights or routing suggestions.
-3. Serverless Architecture: By utilizing the Gemini API directly, the app bypasses the need for traditional database management, significantly reducing development time and operational complexity.
-4. Modern Interface: A clean, responsive React-based dashboard designed for rapid civic reporting.
+2. Secure Identity: Integrated Firebase Authentication for robust user management, ensuring personal tracking and secure access to report history.
+3. Intelligent Resolution: Gemini evaluates the issue description and image, providing immediate actionable insights or routing suggestions.
+4. Serverless Architecture: By utilizing the Gemini API directly, the app bypasses the need for traditional database management, significantly reducing development time and operational complexity.
+5. Modern Interface: A clean, responsive React-based dashboard designed for rapid civic reporting.
 
 # Why AI-as-a-Backend?
 Instead of building a typical CRUD backend, Samadhaan treats the Gemini model as the database. When a user submits an issue, the system sends the payload to Google AI Studio, which parses the information and returns a structured object that is immediately rendered in the React dashboard.
