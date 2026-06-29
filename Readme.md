@@ -22,26 +22,22 @@ In traditional applications, an issue report requires a database, a server, and 
 Instead of building a typical CRUD backend, Samadhaan treats the Gemini model as the database. When a user submits an issue, the system sends the payload to Google AI Studio, which parses the information and returns a structured object that is immediately rendered in the React dashboard.
 
 # Getting Started
-Clone the repository:
-
-  Bash
-  git clone https://github.com/yourusername/samadhaan.git
+    Clone the repository:
+    Bash
+    git clone https://github.com/yourusername/samadhaan.git
   
-Install dependencies:
+    Install dependencies:
+    Bash
+    npm install
 
-  Bash
-  npm install
+    Configure Environment:
+    Create a .env.local file and add your Google AI Studio API Key:
+    Plaintext
+    NEXT_PUBLIC_GEMINI_API_KEY=your_key_here
 
-Configure Environment:
-
-  Create a .env.local file and add your Google AI Studio API Key:
-  Plaintext
-  NEXT_PUBLIC_GEMINI_API_KEY=your_key_here
-
-Run the application:
-
-  Bash
-  npm run dev
+    Run the application:
+    Bash
+    npm run dev
 
 # Roadmap (Vibe2Ship)
 1. Project Conceptualization
